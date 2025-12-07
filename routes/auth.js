@@ -170,75 +170,174 @@ router.get('/verify', async (req, res) => {
   }
 });
 
-
-
-
-router.post('/forgot-password', async (req, res) => {
+// ----------------------------------------------------------------------
+router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
 
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'No account found with that email.' });
+    if (!user)
+      return res.status(404).json({ message: "No account found with that email." });
 
-    const token = crypto.randomBytes(32).toString('hex');
+    // Generate reset token
+    const token = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // valid for 15 minutes
+    user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
-    // ✅ DEFINE transporter
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const defaultClient = SibApiV3Sdk.ApiClient.instance;
+    const apiKey = defaultClient.authentications["api-key"];
+    apiKey.apiKey = process.env.BREVO_API_KEY;
+
+    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
     const resetLink = `https://kalpeshkhatri.github.io/hudcredo-frontend/reset.html?token=${token}`;
 
-    await transporter.sendMail({
-      to: email,
-      from: '"Hudcredo" <no-reply@hudcredo.com>',
-      subject: 'Reset your Hudcredo password',
-      html: `
-        <h3>Reset Your Hudcredo Password</h3>
-        <p>Click the link below to reset your password:</p>
-        <a href="${resetLink}">${resetLink}</a>
-        <p>This link expires in 15 minutes.</p>
+    await apiInstance.sendTransacEmail({
+      sender: { email: "kalpquiz@gmail.com", name: "Hudcredo" },
+      to: [{ email }],
+      subject: "Reset your Hudcredo password",
+
+      htmlContent: `
+      <div style="font-family: Arial, sans-serif;">
+        <h2>Password Reset Request</h2>
+        <p>You requested to reset your Hudcredo password.</p>
+
+        <p>Click the button below to set a new password:</p>
+
+        <a href="${resetLink}" style="
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 18px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;">
+          Reset Password
+        </a>
+
+        <p>If the button doesn’t work, copy this link:</p>
+        <p>${resetLink}</p>
+
+        <p>This link will expire in <b>15 minutes</b>.</p>
+      </div>
       `,
     });
 
-    res.status(200).json({ message: 'Password reset link sent to your email.' });
+    res.status(200).json({ message: "Password reset link sent to your email." });
   } catch (err) {
-    console.error('❌ Forgot password error:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error("❌ Forgot password error:", err.message);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-// Reset Password
-router.post('/reset-password', async (req, res) => {
+
+router.post("/reset-password", async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
     const user = await User.findOne({
       resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() }
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: 'Invalid or expired token.' });
+    if (!user)
+      return res.status(400).json({ message: "Invalid or expired token." });
 
     const hashed = await bcrypt.hash(newPassword, 10);
+
     user.password = hashed;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    res.status(200).json({ message: 'Password reset successful. Please log in.' });
+    res.status(200).json({ message: "Password reset successful. Please log in." });
   } catch (err) {
-    console.error('❌ Reset password error:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error("❌ Reset password error:", err.message);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ------------------------------------------------------------------
+
+// router.post('/forgot-password', async (req, res) => {
+//   const { email } = req.body;
+
+//   try {
+//     const user = await User.findOne({ email });
+//     if (!user) return res.status(404).json({ message: 'No account found with that email.' });
+
+//     const token = crypto.randomBytes(32).toString('hex');
+//     user.resetPasswordToken = token;
+//     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // valid for 15 minutes
+//     await user.save();
+
+//     // ✅ DEFINE transporter
+//     const transporter = nodemailer.createTransport({
+//       service: 'Gmail',
+//       auth: {
+//         user: process.env.EMAIL_USER,
+//         pass: process.env.EMAIL_PASS,
+//       },
+//     });
+
+//     const resetLink = `https://kalpeshkhatri.github.io/hudcredo-frontend/reset.html?token=${token}`;
+
+//     await transporter.sendMail({
+//       to: email,
+//       from: '"Hudcredo" <no-reply@hudcredo.com>',
+//       subject: 'Reset your Hudcredo password',
+//       html: `
+//         <h3>Reset Your Hudcredo Password</h3>
+//         <p>Click the link below to reset your password:</p>
+//         <a href="${resetLink}">${resetLink}</a>
+//         <p>This link expires in 15 minutes.</p>
+//       `,
+//     });
+
+//     res.status(200).json({ message: 'Password reset link sent to your email.' });
+//   } catch (err) {
+//     console.error('❌ Forgot password error:', err.message);
+//     res.status(500).json({ message: 'Server error', error: err.message });
+//   }
+// });
+
+// // Reset Password
+// router.post('/reset-password', async (req, res) => {
+//   const { token, newPassword } = req.body;
+
+//   try {
+//     const user = await User.findOne({
+//       resetPasswordToken: token,
+//       resetPasswordExpires: { $gt: Date.now() }
+//     });
+
+//     if (!user) return res.status(400).json({ message: 'Invalid or expired token.' });
+
+//     const hashed = await bcrypt.hash(newPassword, 10);
+//     user.password = hashed;
+//     user.resetPasswordToken = undefined;
+//     user.resetPasswordExpires = undefined;
+//     await user.save();
+
+//     res.status(200).json({ message: 'Password reset successful. Please log in.' });
+//   } catch (err) {
+//     console.error('❌ Reset password error:', err.message);
+//     res.status(500).json({ message: 'Server error', error: err.message });
+//   }
+// });
 
 
 //------------------------------------------------

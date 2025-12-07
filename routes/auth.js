@@ -194,7 +194,7 @@ router.post('/forgot-password', async (req, res) => {
       },
     });
 
-    const resetLink = `http://localhost:1234/reset.html?token=${token}`;
+    const resetLink = `https://kalpeshkhatri.github.io/hudcredo-frontend/reset.html?token=${token}`;
 
     await transporter.sendMail({
       to: email,
